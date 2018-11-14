@@ -10,7 +10,7 @@ Emacs provides many ways to run shell commands. You could, for example, use `M-|
 2. There is no step 2.
 
 
-## Usage.
+## Usage
 
 To use, select a region of text containing the command(s) you wish to run, then run one of the callable commands. The output will be written either to the current buffer or an output buffer, depending on the callable you call:
 
@@ -69,3 +69,20 @@ $ cowsay "Howdy, pardner"
                 ||----w |
                 ||     ||
 ```
+and running `exec-region-and-replace` will result in
+```
+Tue Nov 13 21:13:02 PST 2018
+
+ ________________
+< Howdy, pardner >
+ ----------------
+        \   ^__^
+         \  (oo)\_______
+            (__)\       )\/\
+                ||----w |
+                ||     ||
+```
+
+## Caution
+
+The `replace` functions ave not been tested or debugged very well and might not work as expcted every time. A fix will come. If you have a good fix ready to go, please let me know.

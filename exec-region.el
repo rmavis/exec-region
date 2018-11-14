@@ -3,7 +3,7 @@
 ;; Copyright (C) 2018 Richard Mavis <rmavis@gmail.com>
 
 ;; Author: Richard Mavis <rmavis@gmail.com> - http://richardmavis.info
-;; URL: https://github.com/antonj/scss-mode
+;; URL: https://github.com/rmavis/exec-region
 ;; Created: Nov 13, 2018
 ;; Version: 0.0.1
 ;; Keywords: shell, command, region
