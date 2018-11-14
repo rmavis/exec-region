@@ -85,4 +85,4 @@ Tue Nov 13 21:13:02 PST 2018
 
 ## Caution
 
-The `replace` functions ave not been tested or debugged very well and might not work as expcted every time. A fix will come. If you have a good fix ready to go, please let me know.
+The `replace` functions have not been tested or debugged very well and might not work as expected every time. A fix will come. If you have a good fix ready to go, please let me know.
