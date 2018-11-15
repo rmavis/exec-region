@@ -73,13 +73,13 @@ Each chunk of output will be preceded by the command that generated it."
 (defun exec-region-to-new-buffer ()
   "Executes each line of the region in a shell, printing the output to a buffer."
   (interactive)
-  (exec-region--to-buffer (get-buffer-create "*Exec Region Output*") nil))
+  (exec-region--in-output-buffer nil))
 
 (defun exec-region-to-new-buffer-with-commands ()
   "Executes each line of the region in a shell, printing the output to a buffer.
 Each chunk of output will be preceded by the command that generated it."
   (interactive)
-  (exec-region--to-buffer (get-buffer-create "*Exec Region Output*") t))
+  (exec-region--in-output-buffer t))
 
 (defun exec-region-and-replace ()
   "Executes each line of the region in a shell, replacing the text in the region with the output."
@@ -99,37 +99,35 @@ Each chunk of output will be preceded by the command that generated it."
 
 (defvar exec-region--output-buffer-name "*Exec Region Output*")
 
-(defun exec-region--in-current-buffer (include-commands)
-  (exec-region--to-buffer (current-buffer)
-                          include-commands
-                          (lambda ()
-                            (goto-char (region-end))
-                            (end-of-line)
-                            (newline))))
+(defvar exec-region--prompt-user "$")
+(defvar exec-region--prompt-root "#")
 
 (defun exec-region--in-output-buffer (include-commands)
-  (exec-region--to-buffer (get-buffer-create "*Exec Region Output*") include-commands))
+  "Executes each line of the region in a shell, writing the output to a new buffer.
+If the `include-commands` parameter is `t`, the output will be preceded by the command that generated it."
+  (let ((output-buffer (get-buffer-create exec-region--output-buffer-name)))
+    (exec-region--to-buffer output-buffer
+                            (if include-commands (exec-region--get-prompt) nil))
+    (unless (get-buffer-window output-buffer 0)
+      (display-buffer-below-selected output-buffer '(nil)))))
 
-(defun exec-region--to-buffer (output-buffer &optional include-commands before printer after)
-  "Executes each line of the region in a shell, printing the output to the given buffer."
-  (if (use-region-p)
-      (let ((lines (split-string (buffer-substring (region-beginning) (region-end)) "[\n]+" t "[\n]+"))
-            (prompt (if (eq (user-uid) 0) "#" "$")))
-        (save-mark-and-excursion
-         (unless (null before) (funcall before))
-         (dolist (line lines)
-           (if (not (null printer))
-               (funcall printer output-buffer line include-commands prompt)
-             (exec-region--print-line output-buffer line include-commands prompt)))
-         (unless (null after) (funcall after)))
-        (unless (get-buffer-window output-buffer 0)
-          (display-buffer-below-selected output-buffer '(nil)))
-        (setq deactivate-mark nil))
-    (message "Can't run region: region isn't active.")))
+(defun exec-region--in-current-buffer (include-commands)
+  "Executes each line of the region in a shell, writing the output to the current buffer below the region.
+If the `include-commands` parameter is `t`, the output will be preceded by the command that generated it."
+  (save-mark-and-excursion
+   (exec-region--to-buffer (current-buffer)
+                           (if include-commands (exec-region--get-prompt) nil)
+                           (lambda ()
+                             (goto-char (region-end))
+                             (end-of-line)
+                             (newline))))
+   (setq deactivate-mark nil))
 
 (defun exec-region--exec-and-replace (include-commands)
+  "Executes each line of the region in a shell, replacing each command with its output.
+If the `include-commands` parameter is `t`, the output will be preceded by the command that generated it."
   (exec-region--to-buffer (current-buffer)
-                          include-commands
+                          (if include-commands (exec-region--get-prompt) nil)
                           (lambda ()
                             (delete-region (region-beginning) (region-end)))
                           (lambda (output-buffer command include-command prompt)
@@ -137,13 +135,29 @@ Each chunk of output will be preceded by the command that generated it."
                               (exec-region--print-line output-buffer command include-command prompt)
                               (search-forward "\n" nil t) (replace-match "" nil t)))))
 
-(defun exec-region--print-line (output-buffer command include-command prompt)
-  (with-current-buffer output-buffer
-    (if include-command
-        (insert (format "%s %s\n" prompt command)))
-    (insert (shell-command-to-string command))
-    (newline)))
+(defun exec-region--to-buffer (output-buffer prompt &optional before after)
+  "Executes each line of the region in a shell, writing the output to the given buffer."
+  (if (use-region-p)
+      (let ((lines (exec-region--get-region-lines)))
+        (unless (null before) (funcall before))
+        (dolist (line lines)
+          (exec-region--print-line output-buffer line prompt))
+        (unless (null after) (funcall after)))
+    (message "Can't run region: region isn't active.")))
 
+(defun exec-region--get-region-lines ()
+  (split-string (buffer-substring (region-beginning) (region-end)) "[\n]+" t "[\n]+"))
+
+(defun exec-region--get-prompt ()
+  (if (eq (user-uid) 0) 
+      exec-region--prompt-root
+    exec-region--prompt-user))
+
+(defun exec-region--print-line (output-buffer command prompt)
+  (with-current-buffer output-buffer
+    (if prompt
+        (insert (format "%s %s\n" prompt command)))
+    (insert (shell-command-to-string command))))
 
 (provide 'exec-region)
 ;;; exec-region.el ends here
