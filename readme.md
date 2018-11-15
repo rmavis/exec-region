@@ -41,7 +41,6 @@ then running `exec-region-here` will result in
 date
 cowsay "Howdy, pardner"
 Tue Nov 13 21:00:59 PST 2018
-
  ________________
 < Howdy, pardner >
  ----------------
@@ -50,7 +49,6 @@ Tue Nov 13 21:00:59 PST 2018
             (__)\       )\/\
                 ||----w |
                 ||     ||
-
 ```
 and running `exec-region-here-with-commands` will result in
 ```
@@ -58,7 +56,6 @@ date
 cowsay "Howdy, pardner"
 $ date
 Tue Nov 13 21:04:19 PST 2018
-
 $ cowsay "Howdy, pardner"
  ________________
 < Howdy, pardner >
@@ -72,7 +69,6 @@ $ cowsay "Howdy, pardner"
 and running `exec-region-and-replace` will result in
 ```
 Tue Nov 13 21:13:02 PST 2018
-
  ________________
 < Howdy, pardner >
  ----------------
@@ -82,7 +78,3 @@ Tue Nov 13 21:13:02 PST 2018
                 ||----w |
                 ||     ||
 ```
-
-## Caution
-
-The `replace` functions have not been tested or debugged very well and might not work as expected every time. A fix will come. If you have a good fix ready to go, please let me know.

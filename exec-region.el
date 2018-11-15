@@ -1,6 +1,6 @@
 ;;; exec-region.el --- Functions for executing a region of shell commands
 
-;; Copyright (C) 2018 Richard Mavis <rmavis@gmail.com>
+;; Copyright (C) 2018 Richard Mavis
 
 ;; Author: Richard Mavis <rmavis@gmail.com> - http://richardmavis.info
 ;; URL: https://github.com/rmavis/exec-region
@@ -32,8 +32,8 @@
 ;; on the callable you call:
 ;;   exec-region-here: write the output to the current buffer after the
 ;;     region
-;;   exec-region-to-new-buffer: write the output to a buffer called
-;;     *Exec Region Output*
+;;   exec-region-to-new-buffer: write the output to a buffer named by
+;;     the value of the `exec-region--output-buffer-name` variable
 ;;   exec-region-and-replace: replace the region (in the current buffer)
 ;;     with the output
 ;;
@@ -44,7 +44,7 @@
 ;;; Code:
 
 ;;
-;; Key mappings.
+;; Key bindings.
 ;;
 
 (global-set-key (kbd "C-| h") 'exec-region-here)
@@ -56,108 +56,130 @@
 
 
 ;;
+;; Settings.
+;;
+
+(defvar exec-region--output-buffer-name "*Exec Region Output*")
+(defvar exec-region--prompt-user "$")
+(defvar exec-region--prompt-root "#")
+
+
+;;
 ;; Callable functions.
 ;;
 
-(defun exec-region-here ()
-  "Executes each line of the region in a shell, printing the output below the region."
-  (interactive)
-  (exec-region--in-current-buffer nil))
-
-(defun exec-region-here-with-commands ()
-  "Executes each line of the region in a shell, printing the output below the region.
-Each chunk of output will be preceded by the command that generated it."
-  (interactive)
-  (exec-region--in-current-buffer t))
-
+;; exec-region-to-new-buffer :: void -> nil
 (defun exec-region-to-new-buffer ()
   "Executes each line of the region in a shell, printing the output to a buffer."
   (interactive)
-  (exec-region--in-output-buffer nil))
+  (exec-region--check-and-run 'exec-region--in-output-buffer nil))
 
+;; exec-region-to-new-buffer-with-commands :: void -> nil
 (defun exec-region-to-new-buffer-with-commands ()
   "Executes each line of the region in a shell, printing the output to a buffer.
 Each chunk of output will be preceded by the command that generated it."
   (interactive)
-  (exec-region--in-output-buffer t))
+  (exec-region--check-and-run 'exec-region--in-output-buffer t))
 
+;; exec-region-here :: void -> nil
+(defun exec-region-here ()
+  "Executes each line of the region in a shell, printing the output below the region."
+  (interactive)
+  (exec-region--check-and-run 'exec-region--in-current-buffer nil))
+
+;; exec-region-here-with-commands :: void -> nil
+(defun exec-region-here-with-commands ()
+  "Executes each line of the region in a shell, printing the output below the region.
+Each chunk of output will be preceded by the command that generated it."
+  (interactive)
+  (exec-region--check-and-run 'exec-region--in-current-buffer t))
+
+;; exec-region-and-replace :: void -> nil
 (defun exec-region-and-replace ()
   "Executes each line of the region in a shell, replacing the text in the region with the output."
   (interactive)
-  (exec-region--exec-and-replace nil))
+  (exec-region--check-and-run 'exec-region--exec-and-replace nil))
 
+;; exec-region-and-replace-with-commands :: void -> nil
 (defun exec-region-and-replace-with-commands ()
   "Executes each line of the region in a shell, replacing the text in the region with the output.
 Each chunk of output will be preceded by the command that generated it."
   (interactive)
-  (exec-region--exec-and-replace t))
+  (exec-region--check-and-run 'exec-region--exec-and-replace t))
 
 
 ;;
 ;; Non-interactive functions.
 ;;
 
-(defvar exec-region--output-buffer-name "*Exec Region Output*")
+;; exec-region--check-and-run :: (symbol bool) -> nil
+;; The `symbol` parameter must name a function with the signature
+;; ([string] string?) -> nil
+;; that will perform the work on list of strings it's given.
+;; The `bool` parameter indicates whether to include the command
+;; header over the output.
+(defun exec-region--check-and-run (func print-header)
+  "If the region is active, runs the given function with the region's command(s)."
+  (if (use-region-p)
+      (funcall func
+               (exec-region--get-region-lines)
+               (if print-header (exec-region--get-prompt) nil))
+    (message "Can't run region: region isn't active.")))
 
-(defvar exec-region--prompt-user "$")
-(defvar exec-region--prompt-root "#")
-
-(defun exec-region--in-output-buffer (include-commands)
-  "Executes each line of the region in a shell, writing the output to a new buffer.
-If the `include-commands` parameter is `t`, the output will be preceded by the command that generated it."
+;; exec-region--in-output-buffer :: ([string] string?) -> nil
+(defun exec-region--in-output-buffer (lines prompt)
+  "Writes output from the command(s) to an output buffer."
   (let ((output-buffer (get-buffer-create exec-region--output-buffer-name)))
-    (exec-region--to-buffer output-buffer
-                            (if include-commands (exec-region--get-prompt) nil))
+    (with-current-buffer output-buffer
+      (exec-region--print-lines output-buffer lines prompt))
     (unless (get-buffer-window output-buffer 0)
       (display-buffer-below-selected output-buffer '(nil)))))
 
-(defun exec-region--in-current-buffer (include-commands)
-  "Executes each line of the region in a shell, writing the output to the current buffer below the region.
-If the `include-commands` parameter is `t`, the output will be preceded by the command that generated it."
+;; exec-region--in-current-buffer :: ([string] string?) -> nil
+(defun exec-region--in-current-buffer (lines prompt)
+  "Writes output from the command(s) to the current buffer."
   (save-mark-and-excursion
-   (exec-region--to-buffer (current-buffer)
-                           (if include-commands (exec-region--get-prompt) nil)
-                           (lambda ()
-                             (goto-char (region-end))
-                             (end-of-line)
-                             (newline))))
-   (setq deactivate-mark nil))
+   (goto-char (region-end))
+   (end-of-line)
+   (newline)
+   (exec-region--print-lines output-buffer lines prompt))
+  (setq deactivate-mark nil))
 
-(defun exec-region--exec-and-replace (include-commands)
-  "Executes each line of the region in a shell, replacing each command with its output.
-If the `include-commands` parameter is `t`, the output will be preceded by the command that generated it."
-  (exec-region--to-buffer (current-buffer)
-                          (if include-commands (exec-region--get-prompt) nil)
-                          (lambda ()
-                            (delete-region (region-beginning) (region-end)))
-                          (lambda (output-buffer command include-command prompt)
-                            (with-current-buffer output-buffer
-                              (exec-region--print-line output-buffer command include-command prompt)
-                              (search-forward "\n" nil t) (replace-match "" nil t)))))
+;; exec-region--exec-and-replace :: ([string] string?) -> nil
+(defun exec-region--exec-and-replace (lines prompt)
+  "Writes output from the command(s) to the current buffer in place of the region."
+  (save-mark-and-excursion
+   (delete-region (region-beginning) (region-end))
+   (exec-region--print-lines output-buffer lines prompt)
+   (search-backward "\n" nil t) (replace-match "" nil t)))
 
-(defun exec-region--to-buffer (output-buffer prompt &optional before after)
-  "Executes each line of the region in a shell, writing the output to the given buffer."
-  (if (use-region-p)
-      (let ((lines (exec-region--get-region-lines)))
-        (unless (null before) (funcall before))
-        (dolist (line lines)
-          (exec-region--print-line output-buffer line prompt))
-        (unless (null after) (funcall after)))
-    (message "Can't run region: region isn't active.")))
-
+;; exec-region--get-region-lines :: void -> [string]
 (defun exec-region--get-region-lines ()
+  "Returns the region's command(s) as a list of strings."
   (split-string (buffer-substring (region-beginning) (region-end)) "[\n]+" t "[\n]+"))
 
+;; exec-region--get-prompt :: void -> string
 (defun exec-region--get-prompt ()
+  "Returns the prompt according to the user type."
   (if (eq (user-uid) 0) 
       exec-region--prompt-root
     exec-region--prompt-user))
 
+;; exec-region--print-lines :: (buffer [string] string?) -> nil
+(defun exec-region--print-lines (output-buffer lines prompt)
+  "Prints the output from the list of commands to the buffer."
+  (dolist (line lines)
+    (exec-region--print-line output-buffer line prompt)))
+
+;; exec-region--print-line :: (buffer string string?) -> nil
 (defun exec-region--print-line (output-buffer command prompt)
+  "Prints the command's output (and maybe the command itself) to the buffer."
   (with-current-buffer output-buffer
     (if prompt
         (insert (format "%s %s\n" prompt command)))
     (insert (shell-command-to-string command))))
+
+
 
 (provide 'exec-region)
 ;;; exec-region.el ends here
