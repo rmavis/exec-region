@@ -150,7 +150,7 @@ Each chunk of output will be preceded by the command that generated it."
   "Writes output from the command(s) to the current buffer in place of the region."
   (save-mark-and-excursion
    (delete-region (region-beginning) (region-end))
-   (exec-region--print-lines output-buffer lines prompt)
+   (exec-region--print-lines (current-buffer) lines prompt)
    (search-backward "\n" nil t) (replace-match "" nil t)))
 
 ;; exec-region--get-region-lines :: void -> [string]
