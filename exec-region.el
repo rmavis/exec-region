@@ -142,7 +142,7 @@ Each chunk of output will be preceded by the command that generated it."
    (goto-char (region-end))
    (end-of-line)
    (newline)
-   (exec-region--print-lines output-buffer lines prompt))
+   (exec-region--print-lines (current-buffer) lines prompt))
   (setq deactivate-mark nil))
 
 ;; exec-region--exec-and-replace :: ([string] string?) -> nil
